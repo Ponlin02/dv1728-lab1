@@ -6,7 +6,11 @@
 // Enable if you want debugging to be printed, see examble below.
 // Alternative, pass CFLAGS=-DDEBUG to make, make CFLAGS=-DDEBUG
 #define DEBUG
-
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <errno.h>
 
 // Included to get the support library
 #include <calcLib.h>
@@ -63,7 +67,7 @@ int main(int argc, char *argv[]){
     // Find the position of ":"
     char *port_start = strchr(host_start, ':');
     if (!port_start || port_start == host_start) {
-	printf("Error: Port is missing or ':' is misplaced\n");
+	      printf("Error: Port is missing or ':' is misplaced\n");
         return 1;
     }
 
@@ -137,6 +141,57 @@ int main(int argc, char *argv[]){
   printf("Protocol: %s Host %s, port = %d and path = %s.\n",protocol, Desthost,port, Destpath);
 #endif
 
+  //variable that will be filled with data
+  struct addrinfo *res;
 
-  
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+
+  int addrinfo_status = getaddrinfo(Desthost, Destport, &hints, &res);
+  if(addrinfo_status != 0)
+  {
+    printf("\nERROR: getaddrinfo Failed!\n");
+    printf("Returned: %d\n", addrinfo_status);
+    return -1;
+  }
+
+  #ifdef DEBUG
+  printf("getaddrinfo Succeded!\n");
+  #endif
+
+  int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  if(sockfd == -1)
+  {
+    printf("\nSocket creation error\n");
+    printf("Returned: %d\n", sockfd);
+    return -1;
+  }
+
+  #ifdef DEBUG
+  printf("Socket creation Succeded!\n");
+  #endif
+
+  int connect_status = connect(sockfd, res->ai_addr, res->ai_addrlen);
+  if(connect_status != 0)
+  {
+    printf("\nConnection Failed\n");
+    printf("Returned: %d\n", connect_status);
+    //perror("connect");
+    return -1;
+  }
+
+  #ifdef DEBUG
+  printf("Connection Succeded!\n");
+  #endif
+
+  char buffer[1024];
+  ssize_t bytes_recieved = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
+  printf("Bytes recieved: %ld", bytes_recieved);
+
+  printf("\nSERVER RESPONSE:\n\n%s", buffer);
+
+  close(sockfd);
+  freeaddrinfo(res);
 }
