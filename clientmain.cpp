@@ -15,6 +15,43 @@
 // Included to get the support library
 #include <calcLib.h>
 
+int client_calc(const char* src)
+{
+  char operation[10];
+  int n1;
+  int n2;
+  int result;
+
+  sscanf(src, "%s %d %d", operation, &n1, &n2);
+
+  if(strcmp(operation, "add") == 0)
+  {
+    result = n1 + n2;
+  }
+  else if(strcmp(operation, "sub") == 0)
+  {
+    result = n1 - n2;
+  }
+  else if(strcmp(operation, "mul") == 0)
+  {
+    result = n1 * n2;
+  }
+  else if(strcmp(operation, "div") == 0)
+  {
+    result = n1 / n2;
+  }
+  
+  /*#ifdef DEBUG 
+  printf("src is: %s\n", src);
+  printf("operation is: %s\n", operation);
+  printf("first number is: %d\n", n1);
+  printf("second number is: %d\n", n2);
+  printf("result is: %d\n", result);
+  #endif*/
+
+  return result;
+}
+
 int main(int argc, char *argv[]){
   
   
@@ -186,12 +223,34 @@ int main(int argc, char *argv[]){
   printf("Connection Succeded!\n");
   #endif
 
-  char buffer[1024];
-  ssize_t bytes_recieved = recv(sockfd, buffer, sizeof(buffer) - 1, 0);
-  printf("Bytes recieved: %ld", bytes_recieved);
+  char recv_buffer[1024];
+  ssize_t bytes_recieved = recv(sockfd, recv_buffer, sizeof(recv_buffer) - 1, 0);
+  printf("\nBytes recieved: %ld\n", bytes_recieved);
+  printf("SERVER RESPONSE:\n%s", recv_buffer);
 
-  printf("\nSERVER RESPONSE:\n\n%s", buffer);
+  char send_buffer[] = "TEXT TCP 1.1 OK\n";
+  ssize_t bytes_sent = send(sockfd, send_buffer, sizeof(send_buffer) - 1, 0);
+  printf("\nBytes sent: %ld\n", bytes_sent);
+  printf("CLIENT SENT:\n%s\n", send_buffer);
+
+  char recv_buffer2[1024];
+  ssize_t bytes_recieved2 = recv(sockfd, recv_buffer2, sizeof(recv_buffer2) - 1, 0);
+  printf("\nBytes recieved: %ld\n", bytes_recieved2);
+  printf("SERVER RESPONSE:\n%s", recv_buffer2);
+
+  char send_buffer2[1024];
+  sprintf(send_buffer2, "%d", client_calc(recv_buffer2));
+  strcat(send_buffer2, "\n");
+  ssize_t bytes_sent2 = send(sockfd, send_buffer2, sizeof(send_buffer2) - 1, 0);
+  printf("\nBytes sent: %ld\n", bytes_sent2);
+  printf("CLIENT SENT:\n%s\n", send_buffer2);
+
+  char recv_buffer3[1024];
+  ssize_t bytes_recieved3 = recv(sockfd, recv_buffer3, sizeof(recv_buffer3) - 1, 0);
+  printf("\nBytes recieved: %ld\n", bytes_recieved3);
+  printf("SERVER RESPONSE:\n%s", recv_buffer3);
 
   close(sockfd);
   freeaddrinfo(res);
+  return 0;
 }
