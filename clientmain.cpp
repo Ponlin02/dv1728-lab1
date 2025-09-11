@@ -52,6 +52,52 @@ int client_calc(const char* src)
   return result;
 }
 
+ssize_t send_helper(int sockfd, const char* send_buffer)
+{
+  ssize_t bytes_sent = send(sockfd, send_buffer, strlen(send_buffer), 0);
+
+  #ifdef DEBUG
+  printf("\nBytes sent: %ld\n", bytes_sent);
+  printf("CLIENT SENT:\n%s\n", send_buffer);
+  #endif
+
+  return bytes_sent;
+}
+
+ssize_t recv_helper(int sockfd, char* recv_buffer, size_t bufsize)
+{
+  ssize_t bytes_recieved = recv(sockfd, recv_buffer, bufsize - 1, 0);
+  if(bytes_recieved > 0)
+  {
+    recv_buffer[bytes_recieved] = '\0';
+  }
+
+  #ifdef DEBUG
+  printf("\nBytes recieved: %ld\n", bytes_recieved);
+  printf("SERVER RESPONSE:\n%s", recv_buffer);
+  #endif
+  
+  return bytes_recieved;
+}
+
+void case_tcp_text(int sockfd)
+{
+  char recv_buffer[1024];
+  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+
+  char send_buffer[] = "TEXT TCP 1.1 OK\n";
+  send_helper(sockfd, send_buffer);
+
+  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+
+  char send_buffer2[1024];
+  sprintf(send_buffer2, "%d", client_calc(recv_buffer));
+  strcat(send_buffer2, "\n");
+  send_helper(sockfd, send_buffer2);
+
+  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+}
+
 int main(int argc, char *argv[]){
   
   
@@ -179,12 +225,25 @@ int main(int argc, char *argv[]){
 #endif
 
   //variable that will be filled with data
-  struct addrinfo *res;
+  struct addrinfo *res, *pInfo;
 
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_family = AF_UNSPEC;
+  if(strcmp(protocol, "tcp") == 0 || strcmp(protocol, "TCP") == 0)
+  {
+    #ifdef DEBUG
+    printf("\nHELLO from TCP\n");
+    #endif
+    hints.ai_socktype = SOCK_STREAM;
+  }
+  else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
+  {
+    #ifdef DEBUG
+    printf("\nHELLO from UDP\n");
+    #endif
+    hints.ai_socktype = SOCK_DGRAM;
+  }
 
   int addrinfo_status = getaddrinfo(Desthost, Destport, &hints, &res);
   if(addrinfo_status != 0)
@@ -198,7 +257,17 @@ int main(int argc, char *argv[]){
   printf("getaddrinfo Succeded!\n");
   #endif
 
-  int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+  int sockfd;
+  for(pInfo = res; pInfo != NULL; pInfo = pInfo->ai_next)
+  {
+    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if(sockfd != -1)
+    {
+      break;
+    }
+    printf("Socket retry");
+  }
+
   if(sockfd == -1)
   {
     printf("\nSocket creation error\n");
@@ -210,7 +279,7 @@ int main(int argc, char *argv[]){
   printf("Socket creation Succeded!\n");
   #endif
 
-  int connect_status = connect(sockfd, res->ai_addr, res->ai_addrlen);
+  int connect_status = connect(sockfd, pInfo->ai_addr, pInfo->ai_addrlen);
   if(connect_status != 0)
   {
     printf("\nConnection Failed\n");
@@ -223,32 +292,25 @@ int main(int argc, char *argv[]){
   printf("Connection Succeded!\n");
   #endif
 
-  char recv_buffer[1024];
-  ssize_t bytes_recieved = recv(sockfd, recv_buffer, sizeof(recv_buffer) - 1, 0);
-  printf("\nBytes recieved: %ld\n", bytes_recieved);
-  printf("SERVER RESPONSE:\n%s", recv_buffer);
-
-  char send_buffer[] = "TEXT TCP 1.1 OK\n";
-  ssize_t bytes_sent = send(sockfd, send_buffer, sizeof(send_buffer) - 1, 0);
-  printf("\nBytes sent: %ld\n", bytes_sent);
-  printf("CLIENT SENT:\n%s\n", send_buffer);
-
-  char recv_buffer2[1024];
-  ssize_t bytes_recieved2 = recv(sockfd, recv_buffer2, sizeof(recv_buffer2) - 1, 0);
-  printf("\nBytes recieved: %ld\n", bytes_recieved2);
-  printf("SERVER RESPONSE:\n%s", recv_buffer2);
-
-  char send_buffer2[1024];
-  sprintf(send_buffer2, "%d", client_calc(recv_buffer2));
-  strcat(send_buffer2, "\n");
-  ssize_t bytes_sent2 = send(sockfd, send_buffer2, sizeof(send_buffer2) - 1, 0);
-  printf("\nBytes sent: %ld\n", bytes_sent2);
-  printf("CLIENT SENT:\n%s\n", send_buffer2);
-
-  char recv_buffer3[1024];
-  ssize_t bytes_recieved3 = recv(sockfd, recv_buffer3, sizeof(recv_buffer3) - 1, 0);
-  printf("\nBytes recieved: %ld\n", bytes_recieved3);
-  printf("SERVER RESPONSE:\n%s", recv_buffer3);
+  if(strcmp(protocol, "tcp") == 0 || strcmp(protocol, "TCP") == 0)
+  {
+    if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
+    {
+      case_tcp_text(sockfd);
+    }
+    else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
+    {
+    }
+  }
+  else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
+  {
+    if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
+    {
+    }
+    else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
+    {
+    }
+  }
 
   close(sockfd);
   freeaddrinfo(res);
