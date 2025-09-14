@@ -10,6 +10,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <netdb.h>
+#include "protocol.h"
 #include <errno.h>
 
 // Included to get the support library
@@ -52,6 +53,32 @@ int client_calc(const char* src)
   return result;
 }
 
+uint32_t client_calc(uint32_t operation, uint32_t n1, uint32_t n2)
+{
+  if(operation == 1)
+  {
+    return n1 + n2;
+  }
+  else if(operation == 2)
+  {
+    return n1 - n2;
+  }
+  else if(operation == 3)
+  {
+    return n1 * n2;
+  }
+  else if(operation == 4)
+  {
+    return n1 / n2;
+  }
+  else
+  {
+    printf("ERROR: Incorrect use of client_calc");
+    return -1;
+  }
+  
+}
+
 ssize_t send_helper(int sockfd, const char* send_buffer)
 {
   ssize_t bytes_sent = send(sockfd, send_buffer, strlen(send_buffer), 0);
@@ -85,9 +112,14 @@ void case_tcp_text(int sockfd)
   char recv_buffer[1024];
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
 
+  if(strstr(recv_buffer, "TEXT TCP 1.1") == NULL)
+  {
+    printf("ERROR: MISSMATCH PROTOCOL\n");
+    return;
+  }
+
   char send_buffer[] = "TEXT TCP 1.1 OK\n";
   send_helper(sockfd, send_buffer);
-
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
 
   char send_buffer2[1024];
@@ -96,6 +128,71 @@ void case_tcp_text(int sockfd)
   send_helper(sockfd, send_buffer2);
 
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+}
+
+void case_udp_binary(int sockfd)
+{
+  calcMessage msg;
+  msg.type = htons(22);
+  msg.message = htonl(0);
+  msg.protocol = htons(17);
+  msg.major_version = htons(1);
+  msg.minor_version = htons(1);
+
+  calcProtocol pro;
+  printf("Size of msg: %ld\n", sizeof(msg)); //size of message = 12
+  printf("Size of pro: %ld\n", sizeof(pro)); //size of protocol = 26
+  ssize_t bytes_sent = send(sockfd, &msg, sizeof(msg), 0);
+  ssize_t bytes_recieved = recv(sockfd, &pro, sizeof(pro), 0);
+
+  #ifdef DEBUG
+  printf("\nBytes sent: %ld\n", bytes_sent);
+  printf("bytes recieved %ld\n", bytes_recieved);
+  #endif  
+
+  if(bytes_recieved == 26)
+  {
+    pro.arith = ntohl(pro.arith);
+    pro.inValue1 = ntohl(pro.inValue1);
+    pro.inValue2 = ntohl(pro.inValue2);
+    pro.inResult = ntohl(pro.inResult);
+
+    printf("airth: %d\n", pro.arith);
+    printf("inValue1: %d\n", pro.inValue1);
+    printf("inValue2: %d\n", pro.inValue2);
+    printf("inResult: %d\n", pro.inResult);
+    printf("Real result: %d\n", client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  }
+  else
+  {
+    printf("NOT OK\n");
+    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL");
+    return;
+  }
+
+  //prepare for sending back
+  pro.type = htons(2);
+  pro.inResult = htonl(client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  pro.arith = htonl(pro.arith);
+  pro.inValue1 = htonl(pro.inValue1);
+  pro.inValue2 = htonl(pro.inValue2);
+
+  ssize_t bytes_sent2 = send(sockfd, &pro, sizeof(pro), 0);
+  ssize_t bytes_recieved2 = recv(sockfd, &msg, sizeof(pro), 0);
+
+  #ifdef DEBUG
+  printf("\nBytes sent: %ld\n", bytes_sent2);
+  printf("bytes recieved %ld\n", bytes_recieved2);
+  printf("message: %d\n", ntohl(msg.message));
+  #endif
+  if(ntohl(msg.message) == 1)
+  {
+    printf("OK\n");
+  }
+  else
+  {
+    printf("NOT OK\n");
+  }
 }
 
 int main(int argc, char *argv[]){
@@ -248,9 +345,9 @@ int main(int argc, char *argv[]){
   int addrinfo_status = getaddrinfo(Desthost, Destport, &hints, &res);
   if(addrinfo_status != 0)
   {
-    printf("\nERROR: getaddrinfo Failed!\n");
+    printf("\nERROR: getaddrinfo Failed\n");
     printf("Returned: %d\n", addrinfo_status);
-    return -1;
+    return EXIT_FAILURE;
   }
 
   #ifdef DEBUG
@@ -270,9 +367,9 @@ int main(int argc, char *argv[]){
 
   if(sockfd == -1)
   {
-    printf("\nSocket creation error\n");
+    printf("\nERROR: Socket creation Failed\n");
     printf("Returned: %d\n", sockfd);
-    return -1;
+    return EXIT_FAILURE;
   }
 
   #ifdef DEBUG
@@ -282,10 +379,10 @@ int main(int argc, char *argv[]){
   int connect_status = connect(sockfd, pInfo->ai_addr, pInfo->ai_addrlen);
   if(connect_status != 0)
   {
-    printf("\nConnection Failed\n");
+    printf("\nERROR: RESOLVE ISSUE\n");
     printf("Returned: %d\n", connect_status);
     //perror("connect");
-    return -1;
+    return EXIT_FAILURE;
   }
 
   #ifdef DEBUG
@@ -309,6 +406,7 @@ int main(int argc, char *argv[]){
     }
     else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
     {
+      case_udp_binary(sockfd);
     }
   }
 
