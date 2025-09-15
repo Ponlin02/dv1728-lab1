@@ -130,8 +130,137 @@ void case_tcp_text(int sockfd)
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
 }
 
+void case_tcp_binary(int sockfd)
+{
+  char recv_buffer[1024];
+  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+
+  if(strstr(recv_buffer, "BINARY TCP 1.1") == NULL)
+  {
+    printf("ERROR: MISSMATCH PROTOCOL\n");
+    return;
+  }
+
+  char send_buffer[] = "BINARY TCP 1.1 OK\n";
+  ssize_t bytes_sent = send_helper(sockfd, send_buffer);
+
+  calcMessage msg;
+  calcProtocol pro;
+  ssize_t bytes_recieved = recv(sockfd, &pro, sizeof(pro), 0);
+
+  #ifdef DEBUG
+  printf("\nBytes sent: %ld\n", bytes_sent);
+  printf("bytes recieved %ld\n", bytes_recieved);
+  #endif  
+
+  if(bytes_recieved == 26)
+  {
+    pro.arith = ntohl(pro.arith);
+    pro.inValue1 = ntohl(pro.inValue1);
+    pro.inValue2 = ntohl(pro.inValue2);
+    pro.inResult = ntohl(pro.inResult);
+
+    printf("airth: %d\n", pro.arith);
+    printf("inValue1: %d\n", pro.inValue1);
+    printf("inValue2: %d\n", pro.inValue2);
+    printf("inResult: %d\n", pro.inResult);
+    printf("Real result: %d\n", client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  }
+  else if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
+  else
+  {
+    printf("NOT OK\n");
+    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
+    return;
+  }
+
+  //prepare for sending back
+  pro.type = htons(2);
+  pro.inResult = htonl(client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  pro.arith = htonl(pro.arith);
+  pro.inValue1 = htonl(pro.inValue1);
+  pro.inValue2 = htonl(pro.inValue2);
+
+  ssize_t bytes_sent2 = send(sockfd, &pro, sizeof(pro), 0);
+  ssize_t bytes_recieved2 = recv(sockfd, &pro, sizeof(pro), 0);
+
+  #ifdef DEBUG
+  printf("\nBytes sent: %ld\n", bytes_sent2);
+  printf("bytes recieved %ld\n", bytes_recieved2);
+  #endif
+
+  if(bytes_recieved2 == 12)
+  {
+    memcpy(&msg, &pro, 12);
+    if(ntohl(msg.message) == 1)
+    {
+      printf("OK\n");
+    }
+    else
+    {
+      printf("NOT OK\n");
+    }
+  }
+  else if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
+  else
+  {
+    printf("NOT OK\n");
+    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
+    return;
+  }
+  return;
+}
+
+void case_udp_text(int sockfd)
+{
+  //Set options for socket
+  timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+  char recv_buffer[1024];
+  char send_buffer[] = "TEXT UDP 1.1\n";
+  send_helper(sockfd, send_buffer);
+
+  ssize_t bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
+
+  char send_buffer2[1024];
+  sprintf(send_buffer2, "%d", client_calc(recv_buffer));
+  strcat(send_buffer2, "\n");
+  send_helper(sockfd, send_buffer2);
+
+  bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
+
+  return;
+}
+
 void case_udp_binary(int sockfd)
 {
+  //Set options for socket
+  timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
   calcMessage msg;
   msg.type = htons(22);
   msg.message = htonl(0);
@@ -163,10 +292,15 @@ void case_udp_binary(int sockfd)
     printf("inResult: %d\n", pro.inResult);
     printf("Real result: %d\n", client_calc(pro.arith, pro.inValue1, pro.inValue2));
   }
+  else if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
   else
   {
     printf("NOT OK\n");
-    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL");
+    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
     return;
   }
 
@@ -178,21 +312,37 @@ void case_udp_binary(int sockfd)
   pro.inValue2 = htonl(pro.inValue2);
 
   ssize_t bytes_sent2 = send(sockfd, &pro, sizeof(pro), 0);
-  ssize_t bytes_recieved2 = recv(sockfd, &msg, sizeof(pro), 0);
+  ssize_t bytes_recieved2 = recv(sockfd, &pro, sizeof(pro), 0);
 
   #ifdef DEBUG
   printf("\nBytes sent: %ld\n", bytes_sent2);
   printf("bytes recieved %ld\n", bytes_recieved2);
-  printf("message: %d\n", ntohl(msg.message));
   #endif
-  if(ntohl(msg.message) == 1)
+
+  if(bytes_recieved2 == 12)
   {
-    printf("OK\n");
+    memcpy(&msg, &pro, 12);
+    if(ntohl(msg.message) == 1)
+    {
+      printf("OK\n");
+    }
+    else
+    {
+      printf("NOT OK\n");
+    }
+  }
+  else if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
   }
   else
   {
     printf("NOT OK\n");
+    printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
+    return;
   }
+
 }
 
 int main(int argc, char *argv[]){
@@ -310,7 +460,7 @@ int main(int argc, char *argv[]){
     
   /* Do magic */
   int port=atoi(Destport);
-  if (port < 1000 or port >65535) {
+  if (port < 1 or port >65535) {
     printf("Error: Port is out of server scope.\n");
     if ( port > 65535 ) {
       printf("Error: Port is not a valid UDP or TCP port.\n");
@@ -357,7 +507,7 @@ int main(int argc, char *argv[]){
   int sockfd;
   for(pInfo = res; pInfo != NULL; pInfo = pInfo->ai_next)
   {
-    sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    sockfd = socket(pInfo->ai_family, pInfo->ai_socktype, pInfo->ai_protocol);
     if(sockfd != -1)
     {
       break;
@@ -397,12 +547,14 @@ int main(int argc, char *argv[]){
     }
     else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
     {
+      case_tcp_binary(sockfd);
     }
   }
   else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
   {
     if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
     {
+      case_udp_text(sockfd);
     }
     else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
     {
