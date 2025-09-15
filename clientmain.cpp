@@ -219,7 +219,7 @@ void case_tcp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n", result);
+      printf("OK\n");
     }
     else
     {
@@ -237,7 +237,6 @@ void case_tcp_binary(int sockfd)
     printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
     return;
   }
-  return;
 }
 
 void case_udp_text(int sockfd)
@@ -332,7 +331,7 @@ void case_udp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n", result);
+      printf("OK\n");
     }
     else
     {
@@ -350,7 +349,6 @@ void case_udp_binary(int sockfd)
     printf("ERROR: WRONG SIZE OR INCORRECT PROTOCOL\n");
     return;
   }
-
 }
 
 int main(int argc, char *argv[]){
