@@ -5,7 +5,7 @@
 
 // Enable if you want debugging to be printed, see examble below.
 // Alternative, pass CFLAGS=-DDEBUG to make, make CFLAGS=-DDEBUG
-#define DEBUG
+//#define DEBUG
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -41,15 +41,8 @@ int client_calc(const char* src)
   {
     result = n1 / n2;
   }
-  
-  /*#ifdef DEBUG 
-  printf("src is: %s\n", src);
-  printf("operation is: %s\n", operation);
-  printf("first number is: %d\n", n1);
-  printf("second number is: %d\n", n2);
-  printf("result is: %d\n", result);
-  #endif*/
 
+  printf("ASSIGNMENT: %s", src);
   return result;
 }
 
@@ -57,18 +50,22 @@ uint32_t client_calc(uint32_t operation, uint32_t n1, uint32_t n2)
 {
   if(operation == 1)
   {
+    printf("ASSIGNMENT: add %d %d\n", n1, n2);
     return n1 + n2;
   }
   else if(operation == 2)
   {
+    printf("ASSIGNMENT: sub %d %d\n", n1, n2);
     return n1 - n2;
   }
   else if(operation == 3)
   {
+    printf("ASSIGNMENT: mul %d %d\n", n1, n2);
     return n1 * n2;
   }
   else if(operation == 4)
   {
+    printf("ASSIGNMENT: div %d %d\n", n1, n2);
     return n1 / n2;
   }
   else
@@ -123,11 +120,13 @@ void case_tcp_text(int sockfd)
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
 
   char send_buffer2[1024];
-  sprintf(send_buffer2, "%d", client_calc(recv_buffer));
+  int result = client_calc(recv_buffer);
+  sprintf(send_buffer2, "%d", result);
   strcat(send_buffer2, "\n");
   send_helper(sockfd, send_buffer2);
 
   recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  printf("%s", recv_buffer);
 }
 
 void case_tcp_binary(int sockfd)
@@ -160,11 +159,12 @@ void case_tcp_binary(int sockfd)
     pro.inValue2 = ntohl(pro.inValue2);
     pro.inResult = ntohl(pro.inResult);
 
+    #ifdef DEBUG
     printf("airth: %d\n", pro.arith);
     printf("inValue1: %d\n", pro.inValue1);
     printf("inValue2: %d\n", pro.inValue2);
     printf("inResult: %d\n", pro.inResult);
-    printf("Real result: %d\n", client_calc(pro.arith, pro.inValue1, pro.inValue2));
+    #endif 
   }
   else if(bytes_recieved == -1)
   {
@@ -179,8 +179,9 @@ void case_tcp_binary(int sockfd)
   }
 
   //prepare for sending back
+  uint32_t result = client_calc(pro.arith, pro.inValue1, pro.inValue2);
   pro.type = htons(2);
-  pro.inResult = htonl(client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  pro.inResult = htonl(result);
   pro.arith = htonl(pro.arith);
   pro.inValue1 = htonl(pro.inValue1);
   pro.inValue2 = htonl(pro.inValue2);
@@ -198,7 +199,7 @@ void case_tcp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n");
+      printf("OK\n", result);
     }
     else
     {
@@ -249,8 +250,7 @@ void case_udp_text(int sockfd)
     printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
     return;
   }
-
-  return;
+  printf("%s", recv_buffer);
 }
 
 void case_udp_binary(int sockfd)
@@ -269,8 +269,6 @@ void case_udp_binary(int sockfd)
   msg.minor_version = htons(1);
 
   calcProtocol pro;
-  printf("Size of msg: %ld\n", sizeof(msg)); //size of message = 12
-  printf("Size of pro: %ld\n", sizeof(pro)); //size of protocol = 26
   ssize_t bytes_sent = send(sockfd, &msg, sizeof(msg), 0);
   ssize_t bytes_recieved = recv(sockfd, &pro, sizeof(pro), 0);
 
@@ -286,11 +284,12 @@ void case_udp_binary(int sockfd)
     pro.inValue2 = ntohl(pro.inValue2);
     pro.inResult = ntohl(pro.inResult);
 
+    #ifdef DEBUG
     printf("airth: %d\n", pro.arith);
     printf("inValue1: %d\n", pro.inValue1);
     printf("inValue2: %d\n", pro.inValue2);
     printf("inResult: %d\n", pro.inResult);
-    printf("Real result: %d\n", client_calc(pro.arith, pro.inValue1, pro.inValue2));
+    #endif  
   }
   else if(bytes_recieved == -1)
   {
@@ -305,8 +304,9 @@ void case_udp_binary(int sockfd)
   }
 
   //prepare for sending back
+  uint32_t result = client_calc(pro.arith, pro.inValue1, pro.inValue2);
   pro.type = htons(2);
-  pro.inResult = htonl(client_calc(pro.arith, pro.inValue1, pro.inValue2));
+  pro.inResult = htonl(result);
   pro.arith = htonl(pro.arith);
   pro.inValue1 = htonl(pro.inValue1);
   pro.inValue2 = htonl(pro.inValue2);
@@ -324,7 +324,7 @@ void case_udp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n");
+      printf("OK\n", result);
     }
     else
     {
@@ -512,7 +512,9 @@ int main(int argc, char *argv[]){
     {
       break;
     }
+    #ifdef DEBUG
     printf("Socket retry");
+    #endif
   }
 
   if(sockfd == -1)
