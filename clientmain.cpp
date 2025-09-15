@@ -107,7 +107,12 @@ ssize_t recv_helper(int sockfd, char* recv_buffer, size_t bufsize)
 void case_tcp_text(int sockfd)
 {
   char recv_buffer[1024];
-  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  ssize_t bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
 
   if(strstr(recv_buffer, "TEXT TCP 1.1") == NULL)
   {
@@ -117,7 +122,12 @@ void case_tcp_text(int sockfd)
 
   char send_buffer[] = "TEXT TCP 1.1 OK\n";
   send_helper(sockfd, send_buffer);
-  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
 
   char send_buffer2[1024];
   int result = client_calc(recv_buffer);
@@ -125,14 +135,24 @@ void case_tcp_text(int sockfd)
   strcat(send_buffer2, "\n");
   send_helper(sockfd, send_buffer2);
 
-  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
   printf("%s", recv_buffer);
 }
 
 void case_tcp_binary(int sockfd)
 {
   char recv_buffer[1024];
-  recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  ssize_t bytes_recieved = recv_helper(sockfd, recv_buffer, sizeof(recv_buffer));
+  if(bytes_recieved == -1)
+  {
+    printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
+    return;
+  }
 
   if(strstr(recv_buffer, "BINARY TCP 1.1") == NULL)
   {
@@ -145,7 +165,7 @@ void case_tcp_binary(int sockfd)
 
   calcMessage msg;
   calcProtocol pro;
-  ssize_t bytes_recieved = recv(sockfd, &pro, sizeof(pro), 0);
+  bytes_recieved = recv(sockfd, &pro, sizeof(pro), 0);
 
   #ifdef DEBUG
   printf("\nBytes sent: %ld\n", bytes_sent);
@@ -222,12 +242,6 @@ void case_tcp_binary(int sockfd)
 
 void case_udp_text(int sockfd)
 {
-  //Set options for socket
-  timeval tv;
-  tv.tv_sec = 2;
-  tv.tv_usec = 0;
-  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
   char recv_buffer[1024];
   char send_buffer[] = "TEXT UDP 1.1\n";
   send_helper(sockfd, send_buffer);
@@ -255,12 +269,6 @@ void case_udp_text(int sockfd)
 
 void case_udp_binary(int sockfd)
 {
-  //Set options for socket
-  timeval tv;
-  tv.tv_sec = 2;
-  tv.tv_usec = 0;
-  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
   calcMessage msg;
   msg.type = htons(22);
   msg.message = htonl(0);
@@ -523,6 +531,12 @@ int main(int argc, char *argv[]){
     printf("Returned: %d\n", sockfd);
     return EXIT_FAILURE;
   }
+
+  //Set options for socket
+  timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
   #ifdef DEBUG
   printf("Socket creation Succeded!\n");
