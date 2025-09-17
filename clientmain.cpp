@@ -141,7 +141,7 @@ void case_tcp_text(int sockfd)
     printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
     return;
   }
-  printf("%s", recv_buffer);
+  printf("%s (myresult=%d)\n", recv_buffer, result);
 }
 
 void case_tcp_binary(int sockfd)
@@ -219,7 +219,7 @@ void case_tcp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n");
+      printf("OK\n (myresult=%d)\n", result);
     }
     else
     {
@@ -253,7 +253,8 @@ void case_udp_text(int sockfd)
   }
 
   char send_buffer2[1024];
-  sprintf(send_buffer2, "%d", client_calc(recv_buffer));
+  int result = client_calc(recv_buffer);
+  sprintf(send_buffer2, "%d", result);
   strcat(send_buffer2, "\n");
   send_helper(sockfd, send_buffer2);
 
@@ -263,7 +264,7 @@ void case_udp_text(int sockfd)
     printf("ERROR: MESSAGE LOST (TIMEOUT)\n");
     return;
   }
-  printf("%s", recv_buffer);
+  printf("%s (myresult=%d)\n", recv_buffer, result);
 }
 
 void case_udp_binary(int sockfd)
@@ -331,7 +332,7 @@ void case_udp_binary(int sockfd)
     memcpy(&msg, &pro, 12);
     if(ntohl(msg.message) == 1)
     {
-      printf("OK\n");
+      printf("OK\n (myresult=%d)\n", result);
     }
     else
     {
