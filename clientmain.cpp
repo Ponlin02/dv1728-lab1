@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <netdb.h>
 #include "protocol.h"
-#include <errno.h>
 
 // Included to get the support library
 #include <calcLib.h>
@@ -546,7 +545,6 @@ int main(int argc, char *argv[]){
   {
     printf("\nERROR: RESOLVE ISSUE\n");
     printf("Returned: %d\n", connect_status);
-    //perror("connect");
     return EXIT_FAILURE;
   }
 
