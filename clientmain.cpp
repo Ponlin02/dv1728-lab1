@@ -15,6 +15,86 @@
 // Included to get the support library
 #include <calcLib.h>
 
+bool try_connect(int &sockfd, char *protocol, char *Desthost, char *Destport)
+{
+  //variable that will be filled with data
+  struct addrinfo *res, *pInfo;
+
+  struct addrinfo hints;
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = AF_UNSPEC;
+  if(strcmp(protocol, "tcp") == 0 || strcmp(protocol, "TCP") == 0)
+  {
+    #ifdef DEBUG
+    printf("\nHELLO from TCP\n");
+    #endif
+    hints.ai_socktype = SOCK_STREAM;
+  }
+  else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
+  {
+    #ifdef DEBUG
+    printf("\nHELLO from UDP\n");
+    #endif
+    hints.ai_socktype = SOCK_DGRAM;
+  }
+
+  int addrinfo_status = getaddrinfo(Desthost, Destport, &hints, &res);
+  if(addrinfo_status != 0)
+  {
+    printf("\nERROR: getaddrinfo Failed\n");
+    printf("Returned: %d\n", addrinfo_status);
+    return false;
+  }
+
+  #ifdef DEBUG
+  printf("getaddrinfo Succeded!\n");
+  #endif
+
+  for(pInfo = res; pInfo != NULL; pInfo = pInfo->ai_next)
+  {
+    sockfd = socket(pInfo->ai_family, pInfo->ai_socktype, pInfo->ai_protocol);
+    if(sockfd != -1)
+    {
+      break;
+    }
+    #ifdef DEBUG
+    printf("Socket retry");
+    #endif
+  }
+
+  if(sockfd == -1)
+  {
+    printf("\nERROR: Socket creation Failed\n");
+    printf("Returned: %d\n", sockfd);
+    return false;
+  }
+
+  //Set options for socket
+  timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+  #ifdef DEBUG
+  printf("Socket creation Succeded!\n");
+  #endif
+
+  int connect_status = connect(sockfd, pInfo->ai_addr, pInfo->ai_addrlen);
+  if(connect_status != 0)
+  {
+    printf("\nERROR: RESOLVE ISSUE\n");
+    printf("Returned: %d\n", connect_status);
+    return false;
+  }
+
+  #ifdef DEBUG
+  printf("Connection Succeded!\n");
+  #endif
+
+  freeaddrinfo(res);
+  return true;
+}
+
 int client_calc(const char* src)
 {
   char operation[10];
@@ -477,83 +557,11 @@ int main(int argc, char *argv[]){
   printf("Protocol: %s Host %s, port = %d and path = %s.\n",protocol, Desthost,port, Destpath);
 #endif
 
-  //variable that will be filled with data
-  struct addrinfo *res, *pInfo;
-
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
-  hints.ai_family = AF_UNSPEC;
-  if(strcmp(protocol, "tcp") == 0 || strcmp(protocol, "TCP") == 0)
-  {
-    #ifdef DEBUG
-    printf("\nHELLO from TCP\n");
-    #endif
-    hints.ai_socktype = SOCK_STREAM;
-  }
-  else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
-  {
-    #ifdef DEBUG
-    printf("\nHELLO from UDP\n");
-    #endif
-    hints.ai_socktype = SOCK_DGRAM;
-  }
-
-  int addrinfo_status = getaddrinfo(Desthost, Destport, &hints, &res);
-  if(addrinfo_status != 0)
-  {
-    printf("\nERROR: getaddrinfo Failed\n");
-    printf("Returned: %d\n", addrinfo_status);
-    return EXIT_FAILURE;
-  }
-
-  #ifdef DEBUG
-  printf("getaddrinfo Succeded!\n");
-  #endif
-
   int sockfd;
-  for(pInfo = res; pInfo != NULL; pInfo = pInfo->ai_next)
-  {
-    sockfd = socket(pInfo->ai_family, pInfo->ai_socktype, pInfo->ai_protocol);
-    if(sockfd != -1)
-    {
-      break;
-    }
-    #ifdef DEBUG
-    printf("Socket retry");
-    #endif
-  }
-
-  if(sockfd == -1)
-  {
-    printf("\nERROR: Socket creation Failed\n");
-    printf("Returned: %d\n", sockfd);
-    return EXIT_FAILURE;
-  }
-
-  //Set options for socket
-  timeval tv;
-  tv.tv_sec = 2;
-  tv.tv_usec = 0;
-  setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
-  #ifdef DEBUG
-  printf("Socket creation Succeded!\n");
-  #endif
-
-  int connect_status = connect(sockfd, pInfo->ai_addr, pInfo->ai_addrlen);
-  if(connect_status != 0)
-  {
-    printf("\nERROR: RESOLVE ISSUE\n");
-    printf("Returned: %d\n", connect_status);
-    return EXIT_FAILURE;
-  }
-
-  #ifdef DEBUG
-  printf("Connection Succeded!\n");
-  #endif
 
   if(strcmp(protocol, "tcp") == 0 || strcmp(protocol, "TCP") == 0)
   {
+    try_connect(sockfd, protocol, Desthost, Destport);
     if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
     {
       case_tcp_text(sockfd);
@@ -565,6 +573,7 @@ int main(int argc, char *argv[]){
   }
   else if(strcmp(protocol, "udp") == 0 || strcmp(protocol, "UDP") == 0)
   {
+    try_connect(sockfd, protocol, Desthost, Destport);
     if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
     {
       case_udp_text(sockfd);
@@ -574,8 +583,32 @@ int main(int argc, char *argv[]){
       case_udp_binary(sockfd);
     }
   }
+  else if(strcmp(protocol, "any") == 0 || strcmp(protocol, "ANY") == 0)
+  {
+    if(try_connect(sockfd, "tcp", Desthost, Destport))
+    {
+      if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
+      {
+        case_tcp_text(sockfd);
+      }
+      else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
+      {
+        case_tcp_binary(sockfd);
+      }
+    }
+    else if(try_connect(sockfd, "udp", Desthost, Destport))
+    {
+      if(strcmp(pathstring, "text") == 0 || strcmp(pathstring, "TEXT") == 0)
+      {
+        case_udp_text(sockfd);
+      }
+      else if(strcmp(pathstring, "binary") == 0 || strcmp(pathstring, "BINARY") == 0)
+      {
+        case_udp_binary(sockfd);
+      }
+    }
+  }
 
   close(sockfd);
-  freeaddrinfo(res);
   return 0;
 }
